@@ -1,0 +1,83 @@
+{
+  "experience": [
+    {
+      "dates": "Jan 26 - Jul 26",
+      "company": "NEWFUND|",
+      "company_type": "French & US Venture Capital Fund",
+      "location": "Paris",
+      "role": "VC Operating Analyst",
+      "bullets": [
+        "Developed Eurheka, an AI tool aggregating and structuring multi-source scientific and patent data into actionable insights for deeptech due diligence (+10 regular users in 2 months)",
+        "Leading commercialization efforts at Newfund, testing product-market fit with deeptech founders",
+        "Worked hands-on with portfolio startups on Sales, Product, CS, ideating and improving workflows"
+      ]
+    },
+    {
+      "dates": "Jun 25 - Dec 25",
+      "company": "SORARE|",
+      "company_type": "Scale-up",
+      "location": "Paris",
+      "role": "Business Development & Partnerships Intern",
+      "bullets": [
+        "Automated the annual player card creation process using Python & AppScript, saving the operations team 5+ working days during peak season",
+        "Supported the launch strategy of Sorare's new platform managing the allocation of match tickets from league and club partners",
+        "Built an internal AI-powered Slack agent (JavaScript) centralising company team data for instant access"
+      ]
+    },
+    {
+      "dates": "Mar 24 - Aug 24",
+      "company": "FONDATION PROSPECTIVE & INNOVATION |",
+      "company_type": "Think Tank",
+      "location": "Paris",
+      "role": "Project Manager",
+      "bullets": [
+        "Organised the two largest annual forums (400+ attendees, including ministers and CEOs), enhancing the foundation's visibility and securing 9 new sponsors",
+        "Secured a new partnership with HEC Africa, bringing high-profile speakers to the foundation's events"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "English Learning Platform",
+      "description": "Built a full-stack AI-powered web app (JavaScript, frontend & backend) enabling users to enhance English writing and speaking through adaptive learning. Integrated OpenAI's API to deliver real-time feedback and personalized progress tracking",
+      "sub_bullets": [
+        "Tested by +5 early users with +80% retention / satisfaction rate",
+        "Designed product roadmap to scale toward a SaaS model targeting students and professionals"
+      ]
+    },
+    {
+      "name": "Mybar",
+      "description": "Built a full-stack web app integrating course materials and adaptive multiple-choice quizzes across 3 law subjects to streamline daily revision.",
+      "sub_bullets": [
+        "Used daily by an active student throughout the full exam preparation cycle."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "dates": "2023 - 2027",
+      "institution": "ESCP BUSINESS SCHOOL",
+      "subtitle": "Master in Management - 1st year",
+      "description": "Core courses : Strategy, Corporate finance, Statistics, Python, Excel",
+      "location": "Paris, Madrid"
+    },
+    {
+      "dates": "2023 - 2025",
+      "institution": "UNIVERSITÉ PARIS 1 PANTHÉON SORBONNE",
+      "subtitle": "Bachelor in Law - double degree with ESCP",
+      "description": "Specialisation in Private Law",
+      "location": "Paris"
+    },
+    {
+      "dates": "2021 - 2023",
+      "institution": "LYCÉE MARCELIN BERTHELOT",
+      "subtitle": "Preparatory classes for French Grandes Ecoles - Economics and Business (ECG)",
+      "description": "Specialisations : Mathematics & Computer Science, Geopolitics",
+      "location": "Saint-Maur des Fossés"
+    }
+  ],
+  "skills": {
+    "technical": "Python (automation), AI tools (Claude Code), AppScript, API Integration, Excel (advanced), SQL (basics), JavaScript",
+    "languages": "French (native), English (C1), Spanish (DELE C1)"
+  }
+}
