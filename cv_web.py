@@ -6,6 +6,8 @@ Usage : python3 cv_web.py   →  http://localhost:5001
 
 import json, os, sys, tempfile
 from pathlib import Path
+import re
+import fitz
 from flask import Flask, request, jsonify, send_file, render_template_string
 
 DIR = Path(__file__).parent
@@ -266,31 +268,51 @@ dropzone.addEventListener('drop', e => {
 dropzone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
 
+let uploadedFile = null;
+
 function handleFile(file) {
   if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
+  uploadedFile = file;
   dropzone.querySelector('.drop-title').innerHTML = `<span class="filename">${file.name}</span>`;
   dropzone.querySelector('.drop-sub').textContent  = 'Fichier sélectionné — clique sur Continuer';
   document.getElementById('continue-btn').disabled = false;
 }
 
-function startEditing() {
-  setStep(2);
-  show('edit-section'); hide('upload-section');
-  loadConfig();
+async function startEditing() {
+  const btn = document.getElementById('continue-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analyse du CV…';
+
+  try {
+    const formData = new FormData();
+    formData.append('file', uploadedFile);
+    const res = await fetch('/api/parse-pdf', { method: 'POST', body: formData });
+    if (!res.ok) throw new Error(await res.text());
+    const cfg = await res.json();
+    setStep(2);
+    show('edit-section'); hide('upload-section');
+    populateForm(cfg);
+  } catch(err) {
+    alert('Erreur lors de l\'analyse : ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Continuer →';
+  }
 }
 
 // ── Config ────────────────────────────────────────────────────
+function populateForm(cfg) {
+  document.getElementById('experience-entries').innerHTML = '';
+  (cfg.experience || []).forEach(e => addExpEntry(e));
+  document.getElementById('project-entries').innerHTML = '';
+  (cfg.projects || []).forEach(p => addProjEntry(p));
+  document.getElementById('education-entries').innerHTML = '';
+  (cfg.education || []).forEach(e => addEduEntry(e));
+  document.getElementById('skills-technical').value = cfg.skills?.technical || '';
+  document.getElementById('skills-languages').value = cfg.skills?.languages || '';
+}
+
 function loadConfig() {
-  fetch('/api/config').then(r => r.json()).then(cfg => {
-    document.getElementById('experience-entries').innerHTML = '';
-    (cfg.experience || []).forEach(e => addExpEntry(e));
-    document.getElementById('project-entries').innerHTML = '';
-    (cfg.projects || []).forEach(p => addProjEntry(p));
-    document.getElementById('education-entries').innerHTML = '';
-    (cfg.education || []).forEach(e => addEduEntry(e));
-    document.getElementById('skills-technical').value = cfg.skills?.technical || '';
-    document.getElementById('skills-languages').value = cfg.skills?.languages || '';
-  });
+  fetch('/api/config').then(r => r.json()).then(cfg => populateForm(cfg));
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -505,6 +527,197 @@ def index():
 def get_config():
     with open(CONFIG_FILE, encoding="utf-8") as f:
         return jsonify(json.load(f))
+
+
+def _parse_cv_pdf(pdf_path):
+    """Parse un PDF généré par cv_editor.py en utilisant les positions x connues."""
+    doc = fitz.open(pdf_path)
+    page = doc[0]
+
+    raw_spans = []
+    for block in page.get_text("dict")["blocks"]:
+        if block.get("type") != 0:
+            continue
+        for ln in block["lines"]:
+            for span in ln["spans"]:
+                t = span["text"]
+                if not t.strip():
+                    continue
+                raw_spans.append({
+                    "x": span["origin"][0],
+                    "y": span["origin"][1],
+                    "text": t,
+                    "bold": bool(span["flags"] & 16),
+                })
+    doc.close()
+
+    # Regrouper par ligne (tolérance 4pt sur y)
+    raw_spans.sort(key=lambda s: (s["y"], s["x"]))
+    lines, cur_y, cur_line = [], None, []
+    for s in raw_spans:
+        if cur_y is None or abs(s["y"] - cur_y) <= 4:
+            cur_line.append(s)
+            if cur_y is None:
+                cur_y = s["y"]
+        else:
+            lines.append(cur_line)
+            cur_line, cur_y = [s], s["y"]
+    if cur_line:
+        lines.append(cur_line)
+
+    SECTIONS = {
+        "PROFESSIONAL EXPERIENCE": "experience",
+        "PROJECTS":                "projects",
+        "EDUCATION":               "education",
+        "TECHNICAL AND LANGUAGES SKILLS": "skills",
+    }
+
+    cfg = {"experience": [], "projects": [], "education": [],
+           "skills": {"technical": "", "languages": ""}}
+    section = None
+    cur_exp = cur_proj = cur_edu = None
+
+    def flush():
+        nonlocal cur_exp, cur_proj, cur_edu
+        if cur_exp:  cfg["experience"].append(cur_exp); cur_exp = None
+        if cur_proj: cfg["projects"].append(cur_proj);  cur_proj = None
+        if cur_edu:  cfg["education"].append(cur_edu);  cur_edu = None
+
+    for line in lines:
+        full  = "".join(s["text"] for s in line).strip()
+        min_x = min(s["x"] for s in line)
+
+        # Détecter en-têtes de section
+        matched = None
+        for name, key in SECTIONS.items():
+            if name in full:
+                matched = key
+                break
+        if matched:
+            flush()
+            section = matched
+            continue
+
+        if section is None:
+            continue
+
+        if section == "experience":
+            date_sp = [s for s in line if s["x"] < 110]
+            rest_sp = [s for s in line if s["x"] >= 110]
+            date_t  = "".join(s["text"] for s in date_sp).strip()
+
+            # Nouvelle entrée : dates à gauche + company à droite
+            if date_t and re.search(r'\d{2}', date_t) and rest_sp:
+                flush()
+                bold_co = "".join(s["text"] for s in rest_sp if s["bold"] and s["x"] < 500).strip()
+                reg_co  = "".join(s["text"] for s in rest_sp if not s["bold"] and s["x"] < 500).strip()
+                loc_t   = "".join(s["text"] for s in rest_sp if s["x"] >= 500).strip()
+                cur_exp = {"dates": date_t, "company": bold_co, "company_type": reg_co,
+                           "location": loc_t, "role": "", "bullets": []}
+            elif cur_exp:
+                role_sp = [s for s in line if s["x"] >= 110]
+                if role_sp and all(s["bold"] for s in role_sp) and not cur_exp["role"]:
+                    cur_exp["role"] = "".join(s["text"] for s in role_sp).strip()
+                elif min_x >= 130:
+                    raw_t  = "".join(s["text"] for s in line if s["x"] >= 130)
+                    is_new = "​" in raw_t[:3]   # zero-width space = nouveau bullet (cercle graphique)
+                    bt     = raw_t.replace("​", "").strip()
+                    if bt:
+                        if is_new or not cur_exp["bullets"]:
+                            cur_exp["bullets"].append(bt)
+                        else:
+                            cur_exp["bullets"][-1] += " " + bt
+
+        elif section == "projects":
+            # Nom projet (bold) à x~52.5 — co-localisé avec le "•" à x~34.5
+            name_sp = [s for s in line if s["bold"] and s["x"] >= 48]
+
+            if name_sp:  # nouvelle entrée projet
+                flush()
+                name = "".join(s["text"] for s in name_sp).strip().rstrip(":")
+                # Description inline sur la même ligne, au-delà du nom (x > 48, non bold)
+                inline_sp = [s for s in line if not s["bold"] and s["x"] >= 48]
+                desc = "".join(s["text"] for s in inline_sp).strip()
+                cur_proj = {"name": name, "description": desc, "sub_bullets": []}
+            elif cur_proj:
+                # Format A : tiret x~54.8 + ​ x~57.8 + texte x~60
+                has_subtext = any(s["x"] >= 57 for s in line)
+                # Format B : tiret+texte fusionnés dans un seul span à x~54.8
+                dash_sp = [s for s in line if 52 <= s["x"] <= 56
+                           and s["text"].lstrip().startswith(("‐", "-", "–"))]
+                if has_subtext:
+                    t = "".join(s["text"] for s in line if s["x"] >= 57).strip().replace("​", "")
+                    if t:
+                        cur_proj["sub_bullets"].append(t)
+                elif dash_sp:
+                    for sp in dash_sp:
+                        t = sp["text"].lstrip().lstrip("‐-– ").strip()
+                        if t:
+                            cur_proj["sub_bullets"].append(t)
+                else:  # suite de description à x~52.5
+                    cont = "".join(s["text"] for s in line if s["x"] >= 45 and not s["bold"]).strip()
+                    if cont:
+                        cur_proj["description"] += " " + cont
+
+        elif section == "education":
+            date_sp = [s for s in line if s["x"] < 110]
+            rest_sp = [s for s in line if s["x"] >= 110]
+            date_t  = "".join(s["text"] for s in date_sp).strip()
+
+            if date_t and re.search(r'\d{4}', date_t):
+                flush()
+                inst_t = "".join(s["text"] for s in rest_sp if s["bold"] and s["x"] < 500).strip()
+                loc_t  = "".join(s["text"] for s in rest_sp if s["x"] >= 500).strip()
+                cur_edu = {"dates": date_t, "institution": inst_t,
+                           "subtitle": "", "description": "", "location": loc_t}
+            elif cur_edu and rest_sp:
+                t       = "".join(s["text"] for s in rest_sp).strip()
+                is_bold = any(s["bold"] for s in rest_sp)
+                if is_bold and not cur_edu["subtitle"]:
+                    cur_edu["subtitle"] = t
+                elif t:
+                    cur_edu["description"] = t
+
+        elif section == "skills":
+            bold_t = "".join(s["text"] for s in line if s["bold"]).strip()
+            reg_t  = "".join(s["text"] for s in line if not s["bold"]).strip()
+            if "Technical" in bold_t:
+                cfg["skills"]["technical"] = reg_t
+            elif "Languages" in bold_t:
+                cfg["skills"]["languages"] = reg_t
+
+    flush()
+
+    def _clean(obj):
+        if isinstance(obj, str):
+            s = obj.replace("​", "").replace("\xa0", " ")
+            return re.sub(r" {2,}", " ", s).strip()
+        if isinstance(obj, list):  return [_clean(v) for v in obj]
+        if isinstance(obj, dict):  return {k: _clean(v) for k, v in obj.items()}
+        return obj
+
+    return _clean(cfg)
+
+
+@app.route("/api/parse-pdf", methods=["POST"])
+def parse_pdf():
+    if 'file' not in request.files:
+        return "Fichier manquant", 400
+
+    file = request.files['file']
+    tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    file.save(tmp.name)
+    tmp.close()
+
+    try:
+        return jsonify(_parse_cv_pdf(tmp.name))
+    except Exception as e:
+        return str(e), 500
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
 
 
 @app.route("/api/generate", methods=["POST"])
