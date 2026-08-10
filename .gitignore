@@ -5,3 +5,12 @@ CV JULIEN HASSAN.pdf
 CV JULIEN HASSAN v2.pdf
 CV_preview.pdf
 .DS_Store
+
+# Photo source du header (référencée par cv_config.json, non publiée)
+*.jpeg
+*.jpg
+*.png
+
+# CV de tiers — données personnelles, à ne pas publier
+CV AJ Final*.pdf
+CV ANNA JHYN TAMAKLO IEJ .pdf

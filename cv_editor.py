@@ -31,6 +31,20 @@ BULLET_SIZE  = 13.0
 LINE_H       = 13.5
 SECTION_GAP  = 18.0
 ENTRY_GAP    = 11.0
+EXP_GAP      = 10.0
+
+# Auto-fit : réglages typographiques essayés du plus aéré au plus dense,
+# jusqu'à ce que le contenu tienne au-dessus de MAX_Y.
+MAX_Y = 772.0
+FIT_PRESETS = [
+    # (font_size, line_h, section_gap, entry_gap, exp_gap)
+    (10.0, 13.5, 18.0, 11.0, 10.0),
+    (10.0, 12.5, 15.0,  9.0,  9.0),
+    ( 9.7, 12.0, 13.0,  8.0,  8.0),
+    ( 9.5, 11.6, 12.0,  7.0,  8.0),
+    ( 9.2, 11.2, 11.0,  6.0,  7.0),
+    ( 9.0, 10.8, 10.0,  6.0,  6.0),
+]
 
 X_LEFT     = 36.0
 X_DATE     = 36.8
@@ -49,8 +63,48 @@ GRAY = (0.502, 0.502, 0.502)
 CUT_Y_WITH_EXP = 115.0
 CUT_Y_NO_EXP   = 395.0
 
+# Accroche du header : conservée du PDF source, réécrite si "summary" est
+# présent dans le config. Mesures relevées sur l'original.
+SUMMARY_RECT   = fitz.Rect(34.5, 76.5, 505.0, 112.0)  # zone effacée (hors photo)
+SUMMARY_X      = 36.0
+SUMMARY_X_END  = 500.0
+SUMMARY_Y0     = 87.5    # ~12.8pt sous l'email, comme l'écart tél. → email
+SUMMARY_LINE_H = 11.0    # même respiration que le corps du CV
+SUMMARY_SIZE   = 9.0
+SUMMARY_MAX_LINES = 3
+
+# Photo du header : remplacée si "photo" est présent dans le config.
+PHOTO_DPI = 400.0
+
 
 # ── Polices ──────────────────────────────────────────────────
+# Les polices embarquées dans le PDF source sont sous-ensemblées : elles ne
+# contiennent que les glyphes utilisés à l'origine (le « R » et le « M » de
+# Calibri regular manquaient, remplacés par un fallback à empattements).
+# On préfère donc les fichiers système complets quand ils sont disponibles.
+SYSTEM_FONTS = {
+    "reg": [
+        "/Applications/Microsoft Word.app/Contents/Resources/DFonts/Calibri.ttf",
+        "/Applications/Microsoft PowerPoint.app/Contents/Resources/DFonts/Calibri.ttf",
+    ],
+    "bold": [
+        "/Applications/Microsoft Word.app/Contents/Resources/DFonts/Calibrib.ttf",
+        "/Applications/Microsoft PowerPoint.app/Contents/Resources/DFonts/Calibrib.ttf",
+    ],
+    "arial": [
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/Library/Fonts/Arial.ttf",
+    ],
+}
+
+
+def _system_font(kind):
+    for path in SYSTEM_FONTS.get(kind, []):
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def load_fonts(doc):
     tmp_files = []
 
@@ -72,24 +126,26 @@ def load_fonts(doc):
         elif "arial" in base and "bold" not in base and arial_xref is None:
             arial_xref = f[0]
 
+    fallback = {"reg": cal_xref or 5, "bold": cal_bold_xref or 4, "arial": arial_xref or 6}
     fonts = {
-        "reg":   fitz.Font(fontfile=extract(cal_xref      or 5)),
-        "bold":  fitz.Font(fontfile=extract(cal_bold_xref or 4)),
-        "arial": fitz.Font(fontfile=extract(arial_xref    or 6)),
+        kind: fitz.Font(fontfile=_system_font(kind) or extract(xref))
+        for kind, xref in fallback.items()
     }
     return fonts, tmp_files
 
 
 # ── Utilitaires ──────────────────────────────────────────────
-def wrap(text, font, x_start, x_end=None):
+def wrap(text, font, x_start, x_end=None, size=None):
     if x_end is None:
         x_end = RIGHT_MARGIN
+    if size is None:
+        size = FONT_SIZE
     avail = x_end - x_start
     words = text.split()
     lines, cur = [], ""
     for w in words:
         candidate = (cur + " " + w).strip()
-        if font.text_length(candidate, fontsize=FONT_SIZE) <= avail:
+        if font.text_length(candidate, fontsize=size) <= avail:
             cur = candidate
         else:
             if cur:
@@ -107,7 +163,63 @@ def dashed_line(page, y, x0=35.0, x1=578.0):
         x += 4.5
 
 
+# ── Photo ────────────────────────────────────────────────────
+def find_photo(page):
+    """Retourne l'info de l'image du header (coin haut droit), ou None."""
+    for info in page.get_image_info(xrefs=True):
+        x0, y0, x1, y1 = info["bbox"]
+        if x0 > 400 and y1 < 130 and (x1 - x0) > 30:
+            return info
+    return None
+
+
+def replace_photo(page, photo_path):
+    """Remplace la photo du header, recadrée au ratio du cadre (pas de déformation)."""
+    from io import BytesIO
+    from PIL import Image
+
+    info = find_photo(page)
+    if info is None:
+        print("⚠  Photo introuvable dans le PDF source — remplacement ignoré")
+        return
+
+    frame = fitz.Rect(info["bbox"])
+    ratio = frame.width / frame.height
+
+    img = Image.open(photo_path).convert("RGB")
+    # Recadrage centré au ratio du cadre
+    if img.width / img.height > ratio:
+        w = round(img.height * ratio)
+        box = ((img.width - w) // 2, 0, (img.width - w) // 2 + w, img.height)
+    else:
+        h = round(img.width / ratio)
+        box = (0, (img.height - h) // 2, img.width, (img.height - h) // 2 + h)
+    img = img.crop(box)
+
+    # Rééchantillonnage à PHOTO_DPI (inutile de stocker plus)
+    target_w = round(frame.width / 72.0 * PHOTO_DPI)
+    if img.width > target_w:
+        img = img.resize((target_w, round(target_w / ratio)), Image.LANCZOS)
+
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=92, optimize=True)
+    page.replace_image(info["xref"], stream=buf.getvalue())
+    print(f"ℹ  Photo remplacée : {img.width}×{img.height}px "
+          f"({img.width / (frame.width / 72.0):.0f} dpi)")
+
+
 # ── Sections ─────────────────────────────────────────────────
+def render_summary(tw, fonts, summary):
+    lines = wrap(summary, fonts["reg"], SUMMARY_X, SUMMARY_X_END, size=SUMMARY_SIZE)
+    if len(lines) > SUMMARY_MAX_LINES:
+        print(f"⚠  Accroche trop longue ({len(lines)} lignes, max {SUMMARY_MAX_LINES}) — elle empiète sur la suite")
+    y = SUMMARY_Y0
+    for line in lines:
+        tw.append((SUMMARY_X, y), line, font=fonts["reg"], fontsize=SUMMARY_SIZE)
+        y += SUMMARY_LINE_H
+
+
+
 def render_experience(page, tw, fonts, experiences, y):
     tw.append((X_LEFT, y), "PROFESSIONAL EXPERIENCE", font=fonts["bold"], fontsize=FONT_SIZE)
     dashed_line(page, y + 2)
@@ -148,7 +260,7 @@ def render_experience(page, tw, fonts, experiences, y):
                 y += LINE_H
 
         if i < len(experiences) - 1:
-            y += 10
+            y += EXP_GAP
 
     return y
 
@@ -238,6 +350,38 @@ def render_skills(page, tw, fonts, skills, y):
     return y
 
 
+# ── Rendu complet & auto-fit ─────────────────────────────────
+def render_all(page, tw, fonts, cfg, cut_y):
+    """Écrit toutes les sections et retourne le y atteint en bas de page."""
+    y = cut_y + 8
+    if cfg.get("experience"):
+        y = render_experience(page, tw, fonts, cfg["experience"], y)
+        y += SECTION_GAP
+    y = render_projects(page, tw, fonts, cfg.get("projects", []), y)
+    y = render_education(page, tw, fonts, cfg.get("education", []), y)
+    y = render_skills(page, tw, fonts, cfg.get("skills", {}), y)
+    return y
+
+
+def _apply_metrics(preset):
+    global FONT_SIZE, LINE_H, SECTION_GAP, ENTRY_GAP, EXP_GAP, BULLET_SIZE
+    FONT_SIZE, LINE_H, SECTION_GAP, ENTRY_GAP, EXP_GAP = preset
+    BULLET_SIZE = FONT_SIZE * 1.3
+
+
+def fit_metrics(fonts, cfg, cut_y):
+    """Sélectionne le preset le plus aéré qui tienne sur une page."""
+    for preset in FIT_PRESETS:
+        _apply_metrics(preset)
+        scratch = fitz.open()
+        page = scratch.new_page(width=PAGE_W, height=PAGE_H)
+        y = render_all(page, fitz.TextWriter(page.rect), fonts, cfg, cut_y)
+        scratch.close()
+        if y <= MAX_Y:
+            return preset, y
+    return FIT_PRESETS[-1], y
+
+
 # ── Point d'entrée ───────────────────────────────────────────
 def generate(config_path=CONFIG_FILE, original=ORIGINAL_PDF, output=OUTPUT_PDF):
     config_path = Path(config_path)
@@ -258,21 +402,39 @@ def generate(config_path=CONFIG_FILE, original=ORIGINAL_PDF, output=OUTPUT_PDF):
     fonts, tmp_files = load_fonts(doc)
 
     try:
+        photo = cfg.get("photo", "").strip()
+        if photo:
+            photo_path = Path(photo)
+            if not photo_path.is_absolute():
+                photo_path = DIR / photo_path
+            if photo_path.exists():
+                replace_photo(page, photo_path)
+            else:
+                print(f"⚠  Photo introuvable : {photo_path}")
+
+        summary = cfg.get("summary", "").strip()
         page.add_redact_annot(fitz.Rect(0, cut_y, PAGE_W, PAGE_H), fill=(1, 1, 1))
+        if summary:
+            page.add_redact_annot(SUMMARY_RECT, fill=(1, 1, 1))
         page.apply_redactions()
 
+        preset, y_end = fit_metrics(fonts, cfg, cut_y)
+        if y_end > MAX_Y:
+            print(f"⚠  Contenu trop long : dépasse de {y_end - MAX_Y:.0f}pt même au réglage le plus dense")
+        elif preset is not FIT_PRESETS[0]:
+            print(f"ℹ  Auto-fit : corps {preset[0]}pt / interligne {preset[1]}pt")
+
         tw = fitz.TextWriter(page.rect)
-        y  = cut_y + 8
-
-        if experiences:
-            y = render_experience(page, tw, fonts, experiences, y)
-            y += SECTION_GAP
-
-        y = render_projects(page, tw, fonts, cfg.get("projects", []), y)
-        y = render_education(page, tw, fonts, cfg.get("education", []), y)
-        render_skills(page, tw, fonts, cfg.get("skills", {}), y)
-
+        if summary:
+            render_summary(tw, fonts, summary)
+        render_all(page, tw, fonts, cfg, cut_y)
         tw.write_text(page)
+        # Les Calibri système sont complètes (~1,5 Mo chacune) : on ne garde
+        # que les glyphes réellement utilisés.
+        try:
+            doc.subset_fonts()
+        except Exception as exc:
+            print(f"⚠  Sous-ensemblage des polices impossible ({exc}) — PDF plus lourd")
         doc.save(str(output), garbage=4, deflate=True)
         print(f"✓  Généré : {output}")
 
