@@ -39,6 +39,6 @@ python3 cv_web.py   # puis ouvrir http://localhost:5001
 3. Photo : indiquez le chemin de votre image dans `"photo"`, ou mettez `false` pour la retirer.
 4. Lancez `python3 cv_editor.py`. La mise en page s'ajuste automatiquement pour tenir sur une page.
 
-Le PDF de base `CV JULIEN HASSAN copie.pdf` sert de gabarit : le script y réécrit le contenu à partir du JSON.
+Le script réécrit le contenu d'un PDF gabarit à partir du JSON. Passez-lui un PDF de base avec `--source mon_gabarit.pdf` (par défaut : `CV JULIEN HASSAN copie.pdf`, non inclus dans le repo).
 
 Libre à vous de le réutiliser. Une étoile ⭐ sur le repo fait toujours plaisir.
