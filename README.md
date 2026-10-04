@@ -8,7 +8,7 @@ Ce repo a deux usages :
 
    Applied AI Engineer : je conçois des outils internes et des automatisations IA, de la cartographie des process jusqu'à la mise en production.
 
-2. **Partager le template.** Le CV est généré par un petit outil Python à partir d'un fichier JSON. Si la mise en page vous plaît, vous pouvez la reprendre pour votre propre CV.
+2. **Partager le template.** C'est un CV compatible ATS : texte sélectionnable, une seule colonne, pas de tableaux ni d'images pour le contenu, donc les logiciels de tri des recruteurs le lisent correctement. Il est généré par un petit outil Python à partir d'un fichier JSON. Si la mise en page vous plaît, vous pouvez la reprendre pour votre propre CV.
 
 ## Utiliser le générateur
 
