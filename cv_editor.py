@@ -73,8 +73,17 @@ SUMMARY_LINE_H = 11.0    # même respiration que le corps du CV
 SUMMARY_SIZE   = 9.0
 SUMMARY_MAX_LINES = 3
 
-# Photo du header : remplacée si "photo" est présent dans le config.
+# Photo du header : remplacée si "photo" est présent dans le config,
+# supprimée si "photo" vaut false (CV US/UK). L'accroche prend alors toute la largeur.
 PHOTO_DPI = 400.0
+
+# Ligne de contact sous le téléphone : réécrite si "contact" est présent
+# (liste de {"text", "url"} séparés par « | », chaque élément cliquable).
+CONTACT_RECT  = fitz.Rect(34.5, 66.0, 505.0, 78.0)
+CONTACT_X     = 36.0
+CONTACT_Y     = 75.0
+CONTACT_SIZE  = 10.0
+CONTACT_COLOR = (0.0, 0.0, 1.0)
 
 
 # ── Polices ──────────────────────────────────────────────────
@@ -209,8 +218,28 @@ def replace_photo(page, photo_path):
 
 
 # ── Sections ─────────────────────────────────────────────────
-def render_summary(tw, fonts, summary):
-    lines = wrap(summary, fonts["reg"], SUMMARY_X, SUMMARY_X_END, size=SUMMARY_SIZE)
+def render_contact(page, fonts, contact):
+    tw = fitz.TextWriter(page.rect, color=CONTACT_COLOR)
+    sep = fitz.TextWriter(page.rect)
+    font, x = fonts["reg"], CONTACT_X
+    sep_text = "  |  "
+    for i, item in enumerate(contact):
+        if i:
+            sep.append((x, CONTACT_Y), sep_text, font=font, fontsize=CONTACT_SIZE)
+            x += font.text_length(sep_text, fontsize=CONTACT_SIZE)
+        text = item["text"]
+        w = font.text_length(text, fontsize=CONTACT_SIZE)
+        tw.append((x, CONTACT_Y), text, font=font, fontsize=CONTACT_SIZE)
+        if item.get("url"):
+            page.insert_link({"kind": fitz.LINK_URI, "uri": item["url"],
+                              "from": fitz.Rect(x, CONTACT_Y - 8, x + w, CONTACT_Y + 2)})
+        x += w
+    tw.write_text(page)
+    sep.write_text(page)
+
+
+def render_summary(tw, fonts, summary, x_end=SUMMARY_X_END):
+    lines = wrap(summary, fonts["reg"], SUMMARY_X, x_end, size=SUMMARY_SIZE)
     if len(lines) > SUMMARY_MAX_LINES:
         print(f"⚠  Accroche trop longue ({len(lines)} lignes, max {SUMMARY_MAX_LINES}) — elle empiète sur la suite")
     y = SUMMARY_Y0
@@ -266,6 +295,8 @@ def render_experience(page, tw, fonts, experiences, y):
 
 
 def render_projects(page, tw, fonts, projects, y):
+    if not projects:
+        return y - SECTION_GAP
     tw.append((X_LEFT, y), "PROJECTS", font=fonts["bold"], fontsize=FONT_SIZE)
     dashed_line(page, y + 2)
     y += LINE_H + 6
@@ -337,16 +368,27 @@ def render_education(page, tw, fonts, education, y):
     return y
 
 
+SKILL_LABELS = {"technical": "Technical", "ai": "AI & Automation", "languages": "Languages"}
+
+
 def render_skills(page, tw, fonts, skills, y):
     y += SECTION_GAP
     tw.append((X_LEFT, y), "TECHNICAL AND LANGUAGES SKILLS", font=fonts["bold"], fontsize=FONT_SIZE)
     dashed_line(page, y + 2, x0=34.5, x1=577.0)
     y += LINE_H + 8
-    tw.append((X_LEFT, y), "Technical:", font=fonts["bold"], fontsize=FONT_SIZE)
-    tw.append((79.0,   y), skills.get("technical", ""), font=fonts["reg"], fontsize=FONT_SIZE)
-    y += LINE_H
-    tw.append((X_LEFT, y), "Languages:", font=fonts["bold"], fontsize=FONT_SIZE)
-    tw.append((84.2,   y), skills.get("languages", ""), font=fonts["reg"], fontsize=FONT_SIZE)
+    # Une ligne par clé, dans l'ordre du config ; les valeurs longues sont repliées
+    # sous le libellé.
+    for i, (key, value) in enumerate((k, v) for k, v in skills.items() if v):
+        if i:
+            y += LINE_H
+        label = SKILL_LABELS.get(key, key.replace("_", " ").title()) + ":"
+        tw.append((X_LEFT, y), label, font=fonts["bold"], fontsize=FONT_SIZE)
+        x_val = X_LEFT + fonts["bold"].text_length(label + "  ", fontsize=FONT_SIZE)
+        lines = wrap(value, fonts["reg"], x_val)
+        tw.append((x_val, y), lines[0], font=fonts["reg"], fontsize=FONT_SIZE)
+        for line in lines[1:]:
+            y += LINE_H
+            tw.append((x_val, y), line, font=fonts["reg"], fontsize=FONT_SIZE)
     return y
 
 
@@ -402,8 +444,13 @@ def generate(config_path=CONFIG_FILE, original=ORIGINAL_PDF, output=OUTPUT_PDF):
     fonts, tmp_files = load_fonts(doc)
 
     try:
-        photo = cfg.get("photo", "").strip()
-        if photo:
+        photo = cfg.get("photo", "")
+        photo = photo.strip() if isinstance(photo, str) else photo
+        if photo is False:
+            info = find_photo(page)
+            if info:
+                page.add_redact_annot(fitz.Rect(info["bbox"]), fill=(1, 1, 1))
+        elif photo:
             photo_path = Path(photo)
             if not photo_path.is_absolute():
                 photo_path = DIR / photo_path
@@ -416,7 +463,14 @@ def generate(config_path=CONFIG_FILE, original=ORIGINAL_PDF, output=OUTPUT_PDF):
         page.add_redact_annot(fitz.Rect(0, cut_y, PAGE_W, PAGE_H), fill=(1, 1, 1))
         if summary:
             page.add_redact_annot(SUMMARY_RECT, fill=(1, 1, 1))
-        page.apply_redactions()
+        contact = cfg.get("contact")
+        if contact:
+            for link in page.get_links():
+                if link["from"].intersects(CONTACT_RECT):
+                    page.delete_link(link)
+            page.add_redact_annot(CONTACT_RECT, fill=(1, 1, 1))
+        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_REMOVE if photo is False
+                              else fitz.PDF_REDACT_IMAGE_NONE)
 
         preset, y_end = fit_metrics(fonts, cfg, cut_y)
         if y_end > MAX_Y:
@@ -425,8 +479,11 @@ def generate(config_path=CONFIG_FILE, original=ORIGINAL_PDF, output=OUTPUT_PDF):
             print(f"ℹ  Auto-fit : corps {preset[0]}pt / interligne {preset[1]}pt")
 
         tw = fitz.TextWriter(page.rect)
+        if contact:
+            render_contact(page, fonts, contact)
         if summary:
-            render_summary(tw, fonts, summary)
+            render_summary(tw, fonts, summary,
+                           RIGHT_MARGIN if photo is False else SUMMARY_X_END)
         render_all(page, tw, fonts, cfg, cut_y)
         tw.write_text(page)
         # Les Calibri système sont complètes (~1,5 Mo chacune) : on ne garde
@@ -447,9 +504,16 @@ def generate(config_path=CONFIG_FILE, original=ORIGINAL_PDF, output=OUTPUT_PDF):
                 pass
 
 
+def _arg(name, default):
+    if name in sys.argv:
+        return sys.argv[sys.argv.index(name) + 1]
+    return default
+
+
 if __name__ == "__main__":
-    out = OUTPUT_PDF
+    out = _arg("--output", OUTPUT_PDF)
     if "--preview" in sys.argv:
         out = DIR / "CV_preview.pdf"
         print("Mode preview →", out)
-    generate(output=out)
+    generate(config_path=_arg("--config", CONFIG_FILE),
+             original=_arg("--source", ORIGINAL_PDF), output=out)

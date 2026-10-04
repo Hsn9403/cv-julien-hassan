@@ -1,12 +1,12 @@
 {
-  "photo": "1710414632513-2.jpeg",
-  "summary": "Applied AI Engineer with 2 years of experience across operations, venture capital and startups, specialised in building internal software that generates revenue for clients, from process mapping to production deployment.",
+  "photo": false,
+  "summary": "Applied AI Engineer with 2 years of experience across operations, venture capital and startups, specialized in building internal software that generates revenue for clients, from process mapping to production deployment.",
   "experience": [
     {
-      "dates": "Jun 26 - Present",
+      "dates": "Jun 2026 – Present",
       "company": "HASSCORP|",
       "company_type": "Freelance",
-      "location": "Paris",
+      "location": "Paris, France",
       "role": "Applied AI Engineer",
       "bullets": [
         "Delivered AI tools and automations for 5 clients to date (1 VC fund, 3 startups, 1 construction company), from process mapping to production deployment",
@@ -15,10 +15,10 @@
       ]
     },
     {
-      "dates": "Jan 26 - Jul 26",
+      "dates": "Jan – Jul 2026",
       "company": "NEWFUND|",
       "company_type": "French & US Venture Capital Fund",
-      "location": "Paris",
+      "location": "Paris, France",
       "role": "AI Applied Engineer",
       "bullets": [
         "Developed Eurheka, an AI tool aggregating and structuring multi-source scientific and patent data into actionable insights for deeptech due diligence (+10 regular users in 2 months)",
@@ -27,25 +27,25 @@
       ]
     },
     {
-      "dates": "Jun 25 - Dec 25",
+      "dates": "Jun – Dec 2025",
       "company": "SORARE|",
       "company_type": "Scale-up",
-      "location": "Paris",
+      "location": "Paris, France",
       "role": "Operations Intern",
       "bullets": [
         "Automated the annual player card creation process using Python & Google Apps Script, saving the operations team 5+ working days during peak season",
         "Supported the launch strategy of Sorare's new platform managing the allocation of match tickets from league and club partners",
-        "Built an internal AI-powered Slack agent (JavaScript) centralising company team data for instant access"
+        "Built an internal AI-powered Slack agent (JavaScript) centralizing company team data for instant access"
       ]
     },
     {
-      "dates": "Mar 24 - Aug 24",
+      "dates": "Mar – Aug 2024",
       "company": "FONDATION PROSPECTIVE & INNOVATION |",
       "company_type": "Think Tank",
-      "location": "Paris",
+      "location": "Paris, France",
       "role": "Project Manager",
       "bullets": [
-        "Organised the two largest annual forums (400+ attendees, including ministers and CEOs), enhancing the foundation's visibility and securing 9 new sponsors",
+        "Organized the two largest annual forums (400+ attendees, including ministers and CEOs), enhancing the foundation's visibility and securing 9 new sponsors",
         "Secured a new partnership with HEC Africa, bringing high-profile speakers to the foundation's events"
       ]
     }
@@ -56,21 +56,21 @@
       "dates": "2023 - 2027",
       "institution": "ESCP BUSINESS SCHOOL",
       "subtitle": "Master in Management",
-      "description": "Core courses : Strategy, Corporate finance, Statistics, Python, Excel",
-      "location": "Paris, Madrid"
+      "description": "Core courses: Strategy, Corporate finance, Statistics, Python, Excel",
+      "location": "Paris & Madrid"
     },
     {
       "dates": "2023 - 2025",
       "institution": "UNIVERSITÉ PARIS 1 PANTHÉON SORBONNE",
       "subtitle": "Bachelor in Law - double degree with ESCP",
-      "description": "Specialisation in Private Law - dual-degree track spanning the first two years at ESCP, studied in parallel with the MiM curriculum",
+      "description": "Specialization in Private Law - dual-degree track spanning the first two years at ESCP, studied in parallel with the MiM curriculum",
       "location": "Paris"
     },
     {
       "dates": "2021 - 2023",
       "institution": "LYCÉE MARCELIN BERTHELOT",
       "subtitle": "Preparatory classes for French Grandes Ecoles - Economics and Business (ECG)",
-      "description": "Specialisations : Mathematics & Computer Science, Geopolitics",
+      "description": "Specializations: Mathematics & Computer Science, Geopolitics",
       "location": "Saint-Maur des Fossés"
     }
   ],
