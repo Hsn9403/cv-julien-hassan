@@ -19,10 +19,10 @@
       "company": "NEWFUND|",
       "company_type": "French & US Venture Capital Fund",
       "location": "Paris, France",
-      "role": "AI Applied Engineer",
+      "role": "Applied AI Engineer",
       "bullets": [
         "Developed Eurheka, an AI tool aggregating and structuring multi-source scientific and patent data into actionable insights for deeptech due diligence (+10 regular users in 2 months)",
-        "Built the tech backbone of a new secondaries fund launch: a sourcing platform connecting LP-stake sellers to the fund, and an in-house CRM",
+        "Built the tech backbone of a new secondaries fund: LiquidityDesk, a platform connecting LP-stake sellers with Newfund and the fund's investors, and a custom HubSpot app tailoring the team's CRM interface",
         "Trained 3 portfolio startup CEOs on AI, enabling them to ship 10+ automations in their operations"
       ]
     },
@@ -91,6 +91,10 @@
     {
       "text": "GitHub",
       "url": "https://github.com/hsn9403"
+    },
+    {
+      "text": "hasscorp.fr",
+      "url": "https://hasscorp.fr"
     }
   ]
 }
