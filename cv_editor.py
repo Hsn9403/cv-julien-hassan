@@ -11,6 +11,7 @@ Sections éditables via cv_config.json :
     projects    → projets personnels
     education   → formations
     skills      → compétences techniques et langues
+    links       → mots des bullets d'expérience rendus cliquables (en bleu)
 """
 
 import json, sys, fitz, tempfile, os
@@ -217,6 +218,22 @@ def replace_photo(page, photo_path):
           f"({img.width / (frame.width / 72.0):.0f} dpi)")
 
 
+class InkWriter:
+    """TextWriter multicolore : les fragments sont écrits dans l'ordre où ils
+    sont ajoutés, pour que l'extraction de texte (ATS) suive l'ordre de lecture."""
+    def __init__(self, rect):
+        self.rect, self.chunks = rect, []
+
+    def append(self, pos, text, color=(0, 0, 0), **kw):
+        if not self.chunks or self.chunks[-1][0] != color:
+            self.chunks.append((color, fitz.TextWriter(self.rect, color=color)))
+        self.chunks[-1][1].append(pos, text, **kw)
+
+    def write_text(self, page):
+        for color, writer in self.chunks:
+            writer.write_text(page, color=color)
+
+
 # ── Sections ─────────────────────────────────────────────────
 def render_contact(page, fonts, contact):
     tw = fitz.TextWriter(page.rect, color=CONTACT_COLOR)
@@ -249,7 +266,30 @@ def render_summary(tw, fonts, summary, x_end=SUMMARY_X_END):
 
 
 
-def render_experience(page, tw, fonts, experiences, y):
+def append_linked(page, tw, x, y, line, font, links, used):
+    """Écrit une ligne de bullet ; la 1re occurrence de chaque texte de
+    `links` passe en bleu et devient cliquable."""
+    while True:
+        hits = [(line.find(l["text"]), l) for l in links
+                if l["text"] not in used and l["text"] in line]
+        if not hits:
+            break
+        pos, link = min(hits, key=lambda h: h[0])
+        before, text = line[:pos], link["text"]
+        tw.append((x, y), before, font=font, fontsize=FONT_SIZE)
+        x += font.text_length(before, fontsize=FONT_SIZE)
+        w = font.text_length(text, fontsize=FONT_SIZE)
+        tw.append((x, y), text, color=CONTACT_COLOR, font=font, fontsize=FONT_SIZE)
+        page.insert_link({"kind": fitz.LINK_URI, "uri": link["url"],
+                          "from": fitz.Rect(x, y - FONT_SIZE * 0.8, x + w, y + 2)})
+        used.add(text)
+        x += w
+        line = line[pos + len(text):]
+    tw.append((x, y), line, font=font, fontsize=FONT_SIZE)
+
+
+def render_experience(page, tw, fonts, experiences, y, links=()):
+    used = set()
     tw.append((X_LEFT, y), "PROFESSIONAL EXPERIENCE", font=fonts["bold"], fontsize=FONT_SIZE)
     dashed_line(page, y + 2)
     y += LINE_H + 3
@@ -282,10 +322,8 @@ def render_experience(page, tw, fonts, experiences, y):
                 X_EXP_CIRCLE_R,
                 color=(0, 0, 0), fill=(0, 0, 0)
             )
-            tw.append((X_EXP_TEXT, y), blines[0], font=fonts["reg"], fontsize=FONT_SIZE)
-            y += LINE_H
-            for bl in blines[1:]:
-                tw.append((X_EXP_TEXT, y), bl, font=fonts["reg"], fontsize=FONT_SIZE)
+            for bl in blines:
+                append_linked(page, tw, X_EXP_TEXT, y, bl, fonts["reg"], links, used)
                 y += LINE_H
 
         if i < len(experiences) - 1:
@@ -397,7 +435,7 @@ def render_all(page, tw, fonts, cfg, cut_y):
     """Écrit toutes les sections et retourne le y atteint en bas de page."""
     y = cut_y + 8
     if cfg.get("experience"):
-        y = render_experience(page, tw, fonts, cfg["experience"], y)
+        y = render_experience(page, tw, fonts, cfg["experience"], y, cfg.get("links", []))
         y += SECTION_GAP
     y = render_projects(page, tw, fonts, cfg.get("projects", []), y)
     y = render_education(page, tw, fonts, cfg.get("education", []), y)
@@ -417,7 +455,7 @@ def fit_metrics(fonts, cfg, cut_y):
         _apply_metrics(preset)
         scratch = fitz.open()
         page = scratch.new_page(width=PAGE_W, height=PAGE_H)
-        y = render_all(page, fitz.TextWriter(page.rect), fonts, cfg, cut_y)
+        y = render_all(page, InkWriter(page.rect), fonts, cfg, cut_y)
         scratch.close()
         if y <= MAX_Y:
             return preset, y
@@ -478,7 +516,7 @@ def generate(config_path=CONFIG_FILE, original=ORIGINAL_PDF, output=OUTPUT_PDF):
         elif preset is not FIT_PRESETS[0]:
             print(f"ℹ  Auto-fit : corps {preset[0]}pt / interligne {preset[1]}pt")
 
-        tw = fitz.TextWriter(page.rect)
+        tw = InkWriter(page.rect)
         if contact:
             render_contact(page, fonts, contact)
         if summary:

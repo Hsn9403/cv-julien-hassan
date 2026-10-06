@@ -96,5 +96,15 @@
       "text": "hasscorp.fr",
       "url": "https://hasscorp.fr"
     }
+  ],
+  "links": [
+    {
+      "text": "Eurheka",
+      "url": "https://eurheka.newfundcap.com"
+    },
+    {
+      "text": "LiquidityDesk",
+      "url": "https://liquiditydesk.newfundcap.com"
+    }
   ]
 }

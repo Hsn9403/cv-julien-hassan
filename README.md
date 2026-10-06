@@ -35,7 +35,7 @@ python3 cv_web.py   # puis ouvrir http://localhost:5001
 ## Reprendre le template pour votre CV
 
 1. Forkez ou clonez le repo.
-2. Modifiez `cv_config.json` (ou `cv_config_us.json`) : accroche, expériences, projets, formation, compétences, liens de contact.
+2. Modifiez `cv_config.json` (ou `cv_config_us.json`) : accroche, expériences, projets, formation, compétences, liens de contact, et `links` pour rendre cliquables des mots des puces d'expérience (ex. un nom de produit).
 3. Photo : indiquez le chemin de votre image dans `"photo"`, ou mettez `false` pour la retirer.
 4. Lancez `python3 cv_editor.py`. La mise en page s'ajuste automatiquement pour tenir sur une page.
 
