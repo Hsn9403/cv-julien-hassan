@@ -1,6 +1,6 @@
 {
   "photo": "1710414632513-2.jpeg",
-  "summary": "Business-trained, engineer by choice: after preparing for finance at ESCP, I moved to Applied AI to build what I used to analyse. 2 years across operations, VC and startups shipping revenue-generating internal tools.",
+  "summary": "Passionate about coding since my preparatory classes, I taught myself to build AI products alongside ESCP. 2 years across operations, VC and startups, now looking for Applied AI, Solutions or Forward Deployed Engineer roles from July 2027.",
   "experience": [
     {
       "dates": "Jun 26 - Present",
@@ -9,9 +9,9 @@
       "location": "Paris",
       "role": "Applied AI Engineer",
       "bullets": [
-        "Delivered AI tools and automations for 5 clients to date (1 VC fund, 3 startups, 1 construction company), from process mapping to production deployment",
-        "Built internal tools that directly contribute to the VC fund's IRR",
-        "Shipped white-label software embedded in startup and construction clients, opening new revenue streams sold under their own brand"
+        "Delivered 11 AI tools and automations for 5 clients (1 VC fund, 3 startups, 1 construction company), from scoping workshops with project owners to production deployment",
+        "Automated a VC fund's investor reporting (Google Apps Script, Google Docs API), cutting 2 weeks of work for 3 people to a 30-second generation",
+        "Shipped white-label software embedded in 2 client brands (25 users), now being commercialised as a new revenue stream"
       ]
     },
     {
@@ -21,8 +21,9 @@
       "location": "Paris",
       "role": "Applied AI Engineer",
       "bullets": [
-        "Developed Eurheka, an AI tool aggregating and structuring multi-source scientific and patent data into actionable insights for deeptech due diligence (+10 regular users in 2 months)",
-        "Built the tech backbone of a new secondaries fund: LiquidityDesk, a platform connecting LP-stake sellers with Newfund and the fund's investors, and a custom HubSpot app tailoring the team's CRM interface",
+        "Developed Eurheka, an AI scientific & patent due diligence tool used by the fund's 4 healthcare investors",
+        "Extended it for portfolio startups: describe a product, get 1,000+ qualified US clinicians in 3 min, via an LLM mapping it to MeSH/CPT/DRG codes validated on NLM/CMS data, with human-in-the-loop review",
+        "Built LiquidityDesk, the platform behind a new secondaries fund's fundraising: Next.js/TypeScript app with ~25 API routes and raw SQL on an 8-table PostgreSQL schema, plus a custom HubSpot CRM app",
         "Trained 3 portfolio startup CEOs on AI, enabling them to ship 10+ automations in their operations"
       ]
     },
@@ -34,8 +35,7 @@
       "role": "Operations Intern",
       "bullets": [
         "Automated the annual player card creation process using Python & Google Apps Script, saving the operations team 5+ working days during peak season",
-        "Supported the launch strategy of Sorare's new platform managing the allocation of match tickets from league and club partners",
-        "Built an internal AI-powered Slack agent (JavaScript) centralising company team data for instant access"
+        "Built an internal AI-powered Slack agent (JavaScript) centralising team data, used daily by 90+ employees"
       ]
     },
     {
@@ -56,14 +56,14 @@
       "dates": "2023 - 2027",
       "institution": "ESCP BUSINESS SCHOOL",
       "subtitle": "Master in Management",
-      "description": "Core courses : Strategy, Corporate finance, Statistics, Python, Excel",
+      "description": "Core courses : Corporate finance, Strategy, Negotiation, Python, Statistics",
       "location": "Paris, Madrid"
     },
     {
       "dates": "2023 - 2025",
       "institution": "UNIVERSITÉ PARIS 1 PANTHÉON SORBONNE",
       "subtitle": "Bachelor in Law - double degree with ESCP",
-      "description": "Specialisation in Private Law - dual-degree track spanning the first two years at ESCP, studied in parallel with the MiM curriculum",
+      "description": "Specialisation in Private Law",
       "location": "Paris"
     },
     {
@@ -75,8 +75,8 @@
     }
   ],
   "skills": {
-    "ai": "LLM APIs (OpenAI, Anthropic), AI agents, RAG, n8n, AI-assisted development (Claude Code, Cursor)",
-    "technical": "Python, JavaScript, SQL (basics), Google Apps Script, API integration, HubSpot, Excel (advanced)",
+    "ai": "LLM APIs, AI agents, agent harnesses (Hermes), agent memory systems, MCP servers, LLM evaluation, RAG, n8n",
+    "technical": "Python, JavaScript, TypeScript, SQL / PostgreSQL (advanced), Flask, Next.js, Vercel, CRM configuration, Excel (advanced)",
     "languages": "French (native), English (C1), Spanish (DELE C1)"
   },
   "contact": [

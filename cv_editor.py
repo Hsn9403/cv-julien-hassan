@@ -373,7 +373,7 @@ SKILL_LABELS = {"technical": "Technical", "ai": "AI & Automation", "languages": 
 
 def render_skills(page, tw, fonts, skills, y):
     y += SECTION_GAP
-    tw.append((X_LEFT, y), "TECHNICAL AND LANGUAGES SKILLS", font=fonts["bold"], fontsize=FONT_SIZE)
+    tw.append((X_LEFT, y), "TECHNICAL & LANGUAGE SKILLS", font=fonts["bold"], fontsize=FONT_SIZE)
     dashed_line(page, y + 2, x0=34.5, x1=577.0)
     y += LINE_H + 8
     # Une ligne par clé, dans l'ordre du config ; les valeurs longues sont repliées
