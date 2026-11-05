@@ -11,10 +11,15 @@ Sections éditables via cv_config.json :
     projects    → projets personnels
     education   → formations
     skills      → compétences techniques et langues
+    volunteering → bénévolat (même format que experience)
     links       → mots des bullets d'expérience rendus cliquables (en bleu)
+    bold        → expressions des bullets d'expérience mises en gras
+
+Header : name, phone, contact, summary, photo réécrits s'ils sont présents.
+titles (libellés des sections) et order (ordre des sections) sont optionnels.
 """
 
-import json, sys, fitz, tempfile, os
+import json, re, sys, fitz, tempfile, os
 from pathlib import Path
 
 # ── Chemins ──────────────────────────────────────────────────
@@ -64,6 +69,13 @@ GRAY = (0.502, 0.502, 0.502)
 CUT_Y_WITH_EXP = 115.0
 CUT_Y_NO_EXP   = 395.0
 
+# Nom et téléphone du header : réécrits si "name" / "phone" sont présents.
+NAME_RECT    = fitz.Rect(34.5, 38.5, 505.0, 52.5)
+NAME_ORIGIN  = (36.0, 48.2)
+NAME_SIZE    = 12.0
+PHONE_RECT   = fitz.Rect(34.5, 54.0, 505.0, 65.5)
+PHONE_ORIGIN = (36.0, 62.6)
+
 # Accroche du header : conservée du PDF source, réécrite si "summary" est
 # présent dans le config. Mesures relevées sur l'original.
 SUMMARY_RECT   = fitz.Rect(34.5, 76.5, 505.0, 112.0)  # zone effacée (hors photo)
@@ -85,6 +97,16 @@ CONTACT_X     = 36.0
 CONTACT_Y     = 75.0
 CONTACT_SIZE  = 10.0
 CONTACT_COLOR = (0.0, 0.0, 1.0)
+
+# Titres et ordre des sections par défaut (surchargés par "titles" / "order").
+TITLES = {
+    "experience":   "PROFESSIONAL EXPERIENCE",
+    "projects":     "PROJECTS",
+    "education":    "EDUCATION",
+    "volunteering": "VOLUNTEERING",
+    "skills":       "TECHNICAL & LANGUAGE SKILLS",
+}
+ORDER = ["experience", "projects", "education", "volunteering", "skills"]
 
 
 # ── Polices ──────────────────────────────────────────────────
@@ -151,7 +173,9 @@ def wrap(text, font, x_start, x_end=None, size=None):
     if size is None:
         size = FONT_SIZE
     avail = x_end - x_start
-    words = text.split()
+    # Coupure sur les espaces ordinaires seulement : les espaces insécables
+    # (avant « ; » « : », dans les guillemets) restent collés au mot.
+    words = [w for w in re.split(r"[ \t\r\n]+", text) if w]
     lines, cur = [], ""
     for w in words:
         candidate = (cur + " " + w).strip()
@@ -246,7 +270,8 @@ def render_contact(page, fonts, contact):
             x += font.text_length(sep_text, fontsize=CONTACT_SIZE)
         text = item["text"]
         w = font.text_length(text, fontsize=CONTACT_SIZE)
-        tw.append((x, CONTACT_Y), text, font=font, fontsize=CONTACT_SIZE)
+        (tw if item.get("url") else sep).append((x, CONTACT_Y), text, font=font,
+                                                fontsize=CONTACT_SIZE)
         if item.get("url"):
             page.insert_link({"kind": fitz.LINK_URI, "uri": item["url"],
                               "from": fitz.Rect(x, CONTACT_Y - 8, x + w, CONTACT_Y + 2)})
@@ -266,31 +291,96 @@ def render_summary(tw, fonts, summary, x_end=SUMMARY_X_END):
 
 
 
-def append_linked(page, tw, x, y, line, font, links, used):
-    """Écrit une ligne de bullet ; la 1re occurrence de chaque texte de
-    `links` passe en bleu et devient cliquable."""
-    while True:
-        hits = [(line.find(l["text"]), l) for l in links
-                if l["text"] not in used and l["text"] in line]
-        if not hits:
-            break
-        pos, link = min(hits, key=lambda h: h[0])
-        before, text = line[:pos], link["text"]
-        tw.append((x, y), before, font=font, fontsize=FONT_SIZE)
-        x += font.text_length(before, fontsize=FONT_SIZE)
-        w = font.text_length(text, fontsize=FONT_SIZE)
-        tw.append((x, y), text, color=CONTACT_COLOR, font=font, fontsize=FONT_SIZE)
-        page.insert_link({"kind": fitz.LINK_URI, "uri": link["url"],
-                          "from": fitz.Rect(x, y - FONT_SIZE * 0.8, x + w, y + 2)})
-        used.add(text)
+def styled_runs(text, links, bold, used):
+    """Découpe une bullet en fragments (texte, gras, url). Chaque expression de
+    `bold` passe en gras ; la 1re occurrence (sur tout le CV) de chaque texte de
+    `links` passe en bleu cliquable."""
+    marks = []  # (début, fin, gras, url)
+    for l in links:
+        pos = text.find(l["text"])
+        if l["text"] not in used and pos >= 0:
+            used.add(l["text"])
+            marks.append((pos, pos + len(l["text"]), False, l["url"]))
+    for b in bold:
+        pos = text.find(b)
+        while b and pos >= 0:
+            marks.append((pos, pos + len(b), True, None))
+            pos = text.find(b, pos + len(b))
+    style = [[False, None] for _ in text]
+    for a, z, is_bold, url in marks:
+        for i in range(a, z):
+            style[i][0] |= is_bold
+            style[i][1] = url or style[i][1]
+    runs = []
+    for ch, (is_bold, url) in zip(text, style):
+        if runs and runs[-1][1:] == (is_bold, url):
+            runs[-1][0] += ch
+        else:
+            runs.append([ch, is_bold, url])
+    return [tuple(r) for r in runs]
+
+
+def wrap_runs(runs, fonts, x_start, x_end=None):
+    """Comme wrap(), mais sur des fragments stylés : la largeur de chaque mot
+    est mesurée dans sa police réelle (le gras est plus large)."""
+    avail = (x_end or RIGHT_MARGIN) - x_start
+    font = lambda b: fonts["bold"] if b else fonts["reg"]
+    # Mots = listes de fragments, séparés par les espaces ordinaires.
+    words, cur = [], []
+    for txt, b, url in runs:
+        for k, part in enumerate(re.split(r"[ \t\r\n]+", txt)):
+            if k and cur:
+                words.append(cur)
+                cur = []
+            if part:
+                cur.append((part, b, url))
+    if cur:
+        words.append(cur)
+
+    width = lambda w: sum(font(b).text_length(t, fontsize=FONT_SIZE) for t, b, _ in w)
+    space = fonts["reg"].text_length(" ", fontsize=FONT_SIZE)
+    lines, line, lw = [], [], 0.0
+    for w in words:
+        ww = width(w)
+        if line and lw + space + ww > avail:
+            lines.append(line)
+            line, lw = [], 0.0
+        if line:
+            # L'espace prend le style de ses voisins s'ils le partagent
+            # (lien ou gras sur plusieurs mots), sinon le style normal.
+            prev, nxt = line[-1], w[0]
+            line.append((" ",) + (prev[1:] if prev[1:] == nxt[1:] else (False, None)))
+            lw += space
+        line += w
+        lw += ww
+    if line:
+        lines.append(line)
+    return lines or [[("", False, None)]]
+
+
+def draw_runs(page, tw, fonts, x, y, line):
+    """Écrit une ligne de fragments stylés ; les liens deviennent cliquables."""
+    merged = []
+    for t, b, url in line:
+        if merged and merged[-1][1:] == [b, url]:
+            merged[-1][0] += t
+        else:
+            merged.append([t, b, url])
+    for t, b, url in merged:
+        font = fonts["bold"] if b else fonts["reg"]
+        w = font.text_length(t, fontsize=FONT_SIZE)
+        if url:
+            tw.append((x, y), t, color=CONTACT_COLOR, font=font, fontsize=FONT_SIZE)
+            page.insert_link({"kind": fitz.LINK_URI, "uri": url,
+                              "from": fitz.Rect(x, y - FONT_SIZE * 0.8, x + w, y + 2)})
+        else:
+            tw.append((x, y), t, font=font, fontsize=FONT_SIZE)
         x += w
-        line = line[pos + len(text):]
-    tw.append((x, y), line, font=font, fontsize=FONT_SIZE)
 
 
-def render_experience(page, tw, fonts, experiences, y, links=()):
+def render_experience(page, tw, fonts, experiences, y, title, links=(), bold=()):
     used = set()
-    tw.append((X_LEFT, y), "PROFESSIONAL EXPERIENCE", font=fonts["bold"], fontsize=FONT_SIZE)
+    tw.append((X_LEFT, y), title, font=fonts["bold"], fontsize=FONT_SIZE)
     dashed_line(page, y + 2)
     y += LINE_H + 3
 
@@ -316,14 +406,15 @@ def render_experience(page, tw, fonts, experiences, y, links=()):
         y += LINE_H + 2
 
         for bullet_text in bullets:
-            blines = wrap(bullet_text, fonts["reg"], X_EXP_TEXT)
+            blines = wrap_runs(styled_runs(bullet_text, links, bold, used),
+                               fonts, X_EXP_TEXT)
             page.draw_circle(
                 fitz.Point(X_EXP_CIRCLE_X, y - 1.875),
                 X_EXP_CIRCLE_R,
                 color=(0, 0, 0), fill=(0, 0, 0)
             )
             for bl in blines:
-                append_linked(page, tw, X_EXP_TEXT, y, bl, fonts["reg"], links, used)
+                draw_runs(page, tw, fonts, X_EXP_TEXT, y, bl)
                 y += LINE_H
 
         if i < len(experiences) - 1:
@@ -332,10 +423,8 @@ def render_experience(page, tw, fonts, experiences, y, links=()):
     return y
 
 
-def render_projects(page, tw, fonts, projects, y):
-    if not projects:
-        return y - SECTION_GAP
-    tw.append((X_LEFT, y), "PROJECTS", font=fonts["bold"], fontsize=FONT_SIZE)
+def render_projects(page, tw, fonts, projects, y, title):
+    tw.append((X_LEFT, y), title, font=fonts["bold"], fontsize=FONT_SIZE)
     dashed_line(page, y + 2)
     y += LINE_H + 6
 
@@ -382,9 +471,8 @@ def render_projects(page, tw, fonts, projects, y):
     return y
 
 
-def render_education(page, tw, fonts, education, y):
-    y += SECTION_GAP
-    tw.append((X_DATE, y), "EDUCATION", font=fonts["bold"], fontsize=FONT_SIZE)
+def render_education(page, tw, fonts, education, y, title):
+    tw.append((X_DATE, y), title, font=fonts["bold"], fontsize=FONT_SIZE)
     dashed_line(page, y + 2)
     y += LINE_H + 8
 
@@ -409,9 +497,8 @@ def render_education(page, tw, fonts, education, y):
 SKILL_LABELS = {"technical": "Technical", "ai": "AI & Automation", "languages": "Languages"}
 
 
-def render_skills(page, tw, fonts, skills, y):
-    y += SECTION_GAP
-    tw.append((X_LEFT, y), "TECHNICAL & LANGUAGE SKILLS", font=fonts["bold"], fontsize=FONT_SIZE)
+def render_skills(page, tw, fonts, skills, y, title):
+    tw.append((X_LEFT, y), title, font=fonts["bold"], fontsize=FONT_SIZE)
     dashed_line(page, y + 2, x0=34.5, x1=577.0)
     y += LINE_H + 8
     # Une ligne par clé, dans l'ordre du config ; les valeurs longues sont repliées
@@ -433,13 +520,23 @@ def render_skills(page, tw, fonts, skills, y):
 # ── Rendu complet & auto-fit ─────────────────────────────────
 def render_all(page, tw, fonts, cfg, cut_y):
     """Écrit toutes les sections et retourne le y atteint en bas de page."""
-    y = cut_y + 8
-    if cfg.get("experience"):
-        y = render_experience(page, tw, fonts, cfg["experience"], y, cfg.get("links", []))
-        y += SECTION_GAP
-    y = render_projects(page, tw, fonts, cfg.get("projects", []), y)
-    y = render_education(page, tw, fonts, cfg.get("education", []), y)
-    y = render_skills(page, tw, fonts, cfg.get("skills", {}), y)
+    titles = {**TITLES, **cfg.get("titles", {})}
+    links  = cfg.get("links", [])
+    bold   = cfg.get("bold", [])
+    renderers = {
+        "experience":   lambda y, t: render_experience(page, tw, fonts, cfg["experience"], y, t, links, bold),
+        "volunteering": lambda y, t: render_experience(page, tw, fonts, cfg["volunteering"], y, t, links, bold),
+        "projects":     lambda y, t: render_projects(page, tw, fonts, cfg["projects"], y, t),
+        "education":    lambda y, t: render_education(page, tw, fonts, cfg["education"], y, t),
+        "skills":       lambda y, t: render_skills(page, tw, fonts, cfg["skills"], y, t),
+    }
+    y, first = cut_y + 8, True
+    for section in cfg.get("order", ORDER):
+        if not cfg.get(section):
+            continue
+        if not first:
+            y += SECTION_GAP
+        y, first = renderers[section](y, titles[section]), False
     return y
 
 
@@ -499,8 +596,12 @@ def generate(config_path=CONFIG_FILE, original=ORIGINAL_PDF, output=OUTPUT_PDF):
 
         summary = cfg.get("summary", "").strip()
         page.add_redact_annot(fitz.Rect(0, cut_y, PAGE_W, PAGE_H), fill=(1, 1, 1))
-        if summary:
+        # "summary" présent mais vide → l'accroche du gabarit est effacée
+        if "summary" in cfg:
             page.add_redact_annot(SUMMARY_RECT, fill=(1, 1, 1))
+        for key, rect in (("name", NAME_RECT), ("phone", PHONE_RECT)):
+            if cfg.get(key):
+                page.add_redact_annot(rect, fill=(1, 1, 1))
         contact = cfg.get("contact")
         if contact:
             for link in page.get_links():
@@ -517,6 +618,10 @@ def generate(config_path=CONFIG_FILE, original=ORIGINAL_PDF, output=OUTPUT_PDF):
             print(f"ℹ  Auto-fit : corps {preset[0]}pt / interligne {preset[1]}pt")
 
         tw = InkWriter(page.rect)
+        if cfg.get("name"):
+            tw.append(NAME_ORIGIN, cfg["name"], font=fonts["bold"], fontsize=NAME_SIZE)
+        if cfg.get("phone"):
+            tw.append(PHONE_ORIGIN, cfg["phone"], font=fonts["reg"], fontsize=CONTACT_SIZE)
         if contact:
             render_contact(page, fonts, contact)
         if summary:
