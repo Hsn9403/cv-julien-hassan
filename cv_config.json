@@ -1,6 +1,6 @@
 {
   "photo": "1710414632513-2.jpeg",
-  "summary": "Passionate about coding since my preparatory classes, I taught myself to build AI products alongside ESCP. 2 years across operations, VC and startups, now looking for Applied AI, Solutions or Forward Deployed Engineer roles from July 2027.",
+  "summary": "Passionate about coding since my preparatory classes, I learned at ESCP to apply it to business problems. 2 years across operations, VC and startups, now looking for Applied AI, Solutions or Forward Deployed Engineer roles from July 2027.",
   "experience": [
     {
       "dates": "Jun 26 - Present",
@@ -22,7 +22,7 @@
       "role": "Applied AI Engineer",
       "bullets": [
         "Developed Eurheka, an AI scientific & patent due diligence tool used by the fund's 4 healthcare investors",
-        "Extended it for portfolio startups: describe a product, get 1,000+ qualified US clinicians in 3 min, via an LLM mapping it to MeSH/CPT/DRG codes validated on NLM/CMS data, with human-in-the-loop review",
+        "Turned it into a clinician prospecting tool for startups: 1,000+ qualified US clinicians in 3 min via LLM mapping to MeSH/CPT/DRG codes; outreach hit 80%+ open rate, 5% reply rate, 1 signed deal",
         "Built LiquidityDesk, the platform behind a new secondaries fund's fundraising: Next.js/TypeScript app with ~25 API routes and raw SQL on an 8-table PostgreSQL schema, plus a custom HubSpot CRM app",
         "Trained 3 portfolio startup CEOs on AI, enabling them to ship 10+ automations in their operations"
       ]
@@ -76,7 +76,7 @@
   ],
   "skills": {
     "ai": "LLM APIs, AI agents, agent harnesses (Hermes), agent memory systems, MCP servers, LLM evaluation, RAG, n8n",
-    "technical": "Python, JavaScript, TypeScript, SQL / PostgreSQL (advanced), Flask, Next.js, Vercel, CRM configuration, Excel (advanced)",
+    "technical": "Python, JavaScript, TypeScript, SQL / PostgreSQL (advanced), Flask, Next.js, Clever Cloud, Excel (advanced)",
     "languages": "French (native), English (C1), Spanish (DELE C1)"
   },
   "contact": [
@@ -106,5 +106,22 @@
       "text": "LiquidityDesk",
       "url": "https://liquiditydesk.newfundcap.com"
     }
+  ],
+  "bold": [
+    "11 AI tools",
+    "5 clients",
+    "2 weeks of work for 3 people",
+    "30-second generation",
+    "25 users",
+    "4 healthcare investors",
+    "1,000+ qualified US clinicians in 3 min",
+    "80%+ open rate",
+    "5% reply rate",
+    "1 signed deal",
+    "10+ automations",
+    "5+ working days",
+    "90+ employees",
+    "400+ attendees",
+    "9 new sponsors"
   ]
 }
